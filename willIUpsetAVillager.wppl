@@ -1,0 +1,43 @@
+
+// Define the fishing world model
+var willIUpsetAVillager = function() {
+    /////////////////////////////////////
+    //Establish people interested in using the new hook
+    /////////////////////////////////////
+    var numRecreation = Math.floor(uniform(0, 20));
+
+    var peopleIDs = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18];
+  
+    var peopleIsRecreation = map(
+      function(id) {
+        return id < numRecreation ? true: false
+      },peopleIDs);
+  
+  
+    /////////////////////////////////////
+    //if they are interested, you will go against them
+    //if they are not interested, you wont be at odds with them
+    /////////////////////////////////////
+    var individualFeelingsTowardsYou = map(
+      function(isRecreation) {
+        return isRecreation ? 0:-1
+     }, peopleIsRecreation);
+    
+    /////////////////////////////////////
+    //Condition on the number of people interested in using the new hook
+    /////////////////////////////////////
+  
+    condition (numRecreation == 9)
+  
+    
+    /////////////////////////////////////
+    //See if you go against anyone in the population
+    /////////////////////////////////////
+    var peoplesViewsOnYou = sum(individualFeelingsTowardsYou)
+  
+    
+    return peoplesViewsOnYou < 0
+    
+  
+}
+var dist = Infer({method:"rejection", samples: 1000}, willIUpsetAVillager);
