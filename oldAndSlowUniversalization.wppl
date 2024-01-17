@@ -1,0 +1,134 @@
+// Define the fishing world model
+var willCollapse = function() {
+    var limitToCollapse = 7
+    var populationSize = 20
+  
+  //------------FOR FINDING MAXIMUM OF AN ARRAY ------------------------------
+  // Define a function to compare two values and return the greater of the two
+  var maxFinal = function(numbers) {
+    var max = function(a, b) {
+      return a > b ? a : b;
+    };
+
+    // Use the map function to convert the array to an array of pairs with each element and itself
+    var pairs = map2(function(x, y) {
+      return [x, y];
+    }, numbers, numbers);
+
+    // Use the reduce function to find the maximum value from the array of pairs
+    var maxNumber = reduce(function(pair, currentMax) {
+      // Compare the current element with the current maximum and return the greater of the two
+      return max(pair[0], currentMax);
+    }, numbers[0], pairs);
+    return maxNumber
+  }
+  
+  //-----------------------------------------------------------------------------
+  //------CREATE 19 INDIVIDUAL PEOPLE AND DESIRES ----------------------------------
+  
+var fishRecreationDesire = 3;
+var fishCommercialDesire = 15;
+  
+var thresholdRecreation = Gaussian({mu: fishRecreationDesire, sigma: 1});
+var thresholdCommercial = Gaussian({mu: fishCommercialDesire, sigma: 1});
+
+
+var thresholdRecreationSampleMem = mem(function (personID) {
+  return sample(thresholdRecreation)
+});
+
+var thresholdCommercialSampleMem = mem(function (personID) {
+  return sample(thresholdCommercial)
+});
+  
+var binaryPeople = mem(function (personID) {
+  return flip(.5)
+});
+          
+var sampleBinaryPeople = function (personID, isRecreation) {
+  return isRecreation ? thresholdRecreationSampleMem(personID): thresholdCommercialSampleMem(personID)
+};
+
+var peopleIDs = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20];
+
+var sampleBinaryPeopleDesires = map(
+  function(x) {
+    var binaryPerson = binaryPeople(x)
+    var sampleBinaryPerson = sampleBinaryPeople(x,binaryPerson)
+    return [binaryPerson,sampleBinaryPerson]
+  },peopleIDs);
+
+  //-----------------------------------------------------------------------------
+  //------CREATE HOOKS AND WHAT THEY PRODUCE ----------------------------------
+   //what the hook gives them in reality
+    var fishRecreationStandard = 3
+    var fishCommercialStandard = 15
+    
+    var NEGATIVE_UTILITY = -1
+    
+    //how much fish is produced
+    var fishRecreationUtility = sample(Gaussian({mu: fishRecreationStandard, sigma: 1}));
+    var fishCommercialUtility = sample(Gaussian({mu: fishCommercialStandard, sigma: 1}));
+    
+    var fishRecreationUtilityFunction = function(threshold) {
+      //assumes 1-1, 1 fishFished = 1 utiltiy
+      var utilityResult = threshold < fishRecreationUtility ? NEGATIVE_UTILITY*(fishRecreationUtility-threshold)+threshold : fishRecreationUtility;
+      return utilityResult
+    }
+    var fishCommercialUtilityFunction = function(threshold) {
+      //assumes 1-1, 1 fishFished = 1 utiltiy
+      var utilityResult = threshold < fishCommercialUtility ? NEGATIVE_UTILITY*(fishCommercialUtility-threshold)+threshold : fishCommercialUtility;
+      return utilityResult
+    }
+    
+    var actionsToUtilityFunctions = {"old_hook": fishRecreationUtilityFunction, "new_hook": fishCommercialUtilityFunction}
+  
+  
+   //------------------------------------------------------------------------------
+  //---------FIND THE WORLD OUTCOME -----------------------------------------------
+  var actionFunctionResults = function(threshold) {
+      var actionResults = map (
+        function(key) {
+          var fun = actionsToUtilityFunctions[key]
+          return fun(threshold)
+        }, Object.keys(actionsToUtilityFunctions));
+      return maxFinal(actionResults)
+     }
+  
+ 
+   //given the threshold desires pick actions that maximize the utility
+   var maximizedUtility = map(
+      function(threshold) {
+        var maxForEachAction = actionFunctionResults(threshold[1])
+        return maxForEachAction
+      }, sampleBinaryPeopleDesires);
+  var sumSampleWorldOutcome = sum(maximizedUtility)
+  
+  
+  //------------------------------------------------------------------------------
+  //---------CONDITIONING --------------------------------------------------------
+  
+  var sumOfCommercial = sum(map(
+      function(threshold) {
+        return threshold[0] ? 0:1;
+      }, sampleBinaryPeopleDesires));
+  
+  var numberOfPeopleInterestedInNewHook = 0;
+  var personInterestedInNewHook = 1;
+  
+  //person making the decision wants to fish commercially
+  condition(sampleBinaryPeopleDesires[0][0] == !personInterestedInNewHook)
+  
+  //number of people total interested in the commercial hook
+  condition(sumOfCommercial == numberOfPeopleInterestedInNewHook+personInterestedInNewHook)
+  
+  
+  return sumSampleWorldOutcome > limitToCollapse*fishCommercialStandard
+  
+}
+
+
+var dist = Infer({ method: 'rejection', samples: 100000 }, willCollapse);
+
+
+sample(dist)
